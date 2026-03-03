@@ -2,6 +2,7 @@
 #include "Database/DatabaseEnv.h"
 #include "Entities/Player.h"
 #include "Entities/GossipDef.h"
+#include "AI/ScriptDevAI/include/sc_gossip.h"
 
 namespace cmangos_module
 {
@@ -170,7 +171,11 @@ namespace cmangos_module
         if (!IsEnabled() || !IsTwinkmasterNPC(creature))
             return false;
 
-        player->PlayerTalkClass->ClearMenus();
+        PlayerMenu* playerMenu = player->GetPlayerMenu();
+        if (!playerMenu)
+            return false;
+
+        playerMenu->ClearMenus();
 
         uint32 targetLevel = GetTargetLevel();
         bool isLocked = IsXpLocked(player->GetGUIDLow());
@@ -179,17 +184,17 @@ namespace cmangos_module
         {
             char buf[128];
             snprintf(buf, sizeof(buf), "Set my level to %u and lock XP", targetLevel);
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_BATTLE, buf, GOSSIP_SENDER_MAIN, ACTION_SET_LEVEL_AND_LOCK);
+            playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE, buf, GOSSIP_SENDER_MAIN, ACTION_SET_LEVEL_AND_LOCK, "", false);
         }
 
         if (isLocked)
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_INTERACT_1, "Unlock my XP gain", GOSSIP_SENDER_MAIN, ACTION_UNLOCK_XP);
+            playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, "Unlock my XP gain", GOSSIP_SENDER_MAIN, ACTION_UNLOCK_XP, "", false);
         else
-            player->ADD_GOSSIP_ITEM(GOSSIP_ICON_INTERACT_1, "Lock my XP gain", GOSSIP_SENDER_MAIN, ACTION_LOCK_XP);
+            playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, "Lock my XP gain", GOSSIP_SENDER_MAIN, ACTION_LOCK_XP, "", false);
 
-        player->ADD_GOSSIP_ITEM(GOSSIP_ICON_VENDOR, "Browse your wares", GOSSIP_SENDER_MAIN, ACTION_BROWSE_WARES);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR, "Browse your wares", GOSSIP_SENDER_MAIN, ACTION_BROWSE_WARES, "", false);
 
-        player->PlayerTalkClass->SendGossipMenu(NPC_TEXT_GREETING, creature->GetObjectGuid());
+        playerMenu->SendGossipMenu(NPC_TEXT_GREETING, creature->GetObjectGuid());
         return true;
     }
 
@@ -198,7 +203,11 @@ namespace cmangos_module
         if (!IsEnabled() || !IsTwinkmasterNPC(creature))
             return false;
 
-        player->PlayerTalkClass->ClearMenus();
+        PlayerMenu* playerMenu = player->GetPlayerMenu();
+        if (!playerMenu)
+            return false;
+
+        playerMenu->ClearMenus();
 
         switch (action)
         {
@@ -208,28 +217,28 @@ namespace cmangos_module
                 char buf[256];
                 snprintf(buf, sizeof(buf), "Yes, set me to level %u and lock my XP!", targetLevel);
 
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_BATTLE, buf, GOSSIP_SENDER_MAIN, ACTION_CONFIRM_SET_LEVEL);
-                player->ADD_GOSSIP_ITEM(GOSSIP_ICON_CHAT, "Maybe later...", GOSSIP_SENDER_MAIN, ACTION_MAIN_MENU);
+                playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE, buf, GOSSIP_SENDER_MAIN, ACTION_CONFIRM_SET_LEVEL, "", false);
+                playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT, "Maybe later...", GOSSIP_SENDER_MAIN, ACTION_MAIN_MENU, "", false);
 
-                player->PlayerTalkClass->SendGossipMenu(NPC_TEXT_LEVEL, creature->GetObjectGuid());
+                playerMenu->SendGossipMenu(NPC_TEXT_LEVEL, creature->GetObjectGuid());
                 break;
             }
             case ACTION_CONFIRM_SET_LEVEL:
             {
                 SetLevelAndLock(player);
-                player->PlayerTalkClass->SendCloseGossip();
+                playerMenu->CloseGossip();
                 break;
             }
             case ACTION_LOCK_XP:
             {
                 LockXP(player);
-                player->PlayerTalkClass->SendCloseGossip();
+                playerMenu->CloseGossip();
                 break;
             }
             case ACTION_UNLOCK_XP:
             {
                 UnlockXP(player);
-                player->PlayerTalkClass->SendCloseGossip();
+                playerMenu->CloseGossip();
                 break;
             }
             case ACTION_BROWSE_WARES:
@@ -243,7 +252,7 @@ namespace cmangos_module
                 break;
             }
             default:
-                player->PlayerTalkClass->SendCloseGossip();
+                playerMenu->CloseGossip();
                 break;
         }
 
