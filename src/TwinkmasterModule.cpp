@@ -2,7 +2,8 @@
 #include "Database/DatabaseEnv.h"
 #include "Entities/Player.h"
 #include "Entities/GossipDef.h"
-#include "AI/ScriptDevAI/include/sc_gossip.h"
+#include "Globals/ObjectMgr.h"
+#include "Server/WorldSession.h"
 
 namespace cmangos_module
 {
@@ -12,6 +13,8 @@ namespace cmangos_module
         ACTION_LOCK_XP            = 101,
         ACTION_UNLOCK_XP          = 102,
         ACTION_BROWSE_WARES       = 103,
+        ACTION_BROWSE_HONOR       = 104,
+        ACTION_BROWSE_RARE        = 105,
         ACTION_CONFIRM_SET_LEVEL  = 110,
         ACTION_MAIN_MENU          = 200,
     };
@@ -55,6 +58,116 @@ namespace cmangos_module
 
     void TwinkmasterModule::OnInitialize()
     {
+        if (!IsEnabled())
+            return;
+
+        LoadVendorCategories();
+    }
+
+    void TwinkmasterModule::LoadVendorCategories()
+    {
+        m_vendorCategories.clear();
+
+        auto result = WorldDatabase.Query(
+            "SELECT `item`, `categories` FROM `custom_twinkmaster_vendor_categories`");
+
+        if (!result)
+            return;
+
+        uint32 count = 0;
+        do
+        {
+            Field* fields = result->Fetch();
+            uint32 itemId = fields[0].GetUInt32();
+            uint8 categories = fields[1].GetUInt8();
+            m_vendorCategories[itemId] = categories;
+            ++count;
+        } while (result->NextRow());
+
+        sLog.outString("[Twinkmaster] Loaded %u vendor category entries.", count);
+    }
+
+    void TwinkmasterModule::SendFilteredVendorList(Player* player, Creature* creature, uint8 categoryMask)
+    {
+        if (!player || !creature)
+            return;
+
+        VendorItemData const* vItems = creature->GetVendorItems();
+        if (!vItems || vItems->GetItemCount() == 0)
+        {
+            WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + 1);
+            data << creature->GetObjectGuid();
+            data << uint8(0);
+            data << uint8(0);
+            player->GetSession()->SendPacket(data);
+            return;
+        }
+
+        uint8 numitems = vItems->GetItemCount();
+        uint8 count = 0;
+
+        float discountMod = player->GetReputationPriceDiscount(creature);
+
+        WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + numitems * 7 * 4);
+        data << creature->GetObjectGuid();
+
+        size_t count_pos = data.wpos();
+        data << uint8(count);
+
+        for (uint8 i = 0; i < numitems; ++i)
+        {
+            VendorItem const* crItem = vItems->GetItem(i);
+            if (!crItem)
+                continue;
+
+            // Filter by category
+            auto it = m_vendorCategories.find(crItem->item);
+            if (it == m_vendorCategories.end())
+                continue;
+            if (!(it->second & categoryMask))
+                continue;
+
+            ItemPrototype const* pProto = ObjectMgr::GetItemPrototype(crItem->item);
+            if (!pProto)
+                continue;
+
+            if (!player->IsGameMaster())
+            {
+                if ((pProto->AllowableClass & player->getClassMask()) == 0 && pProto->Bonding == BIND_WHEN_PICKED_UP)
+                    continue;
+
+                if ((pProto->AllowableRace & player->getRaceMask()) == 0)
+                    continue;
+            }
+
+            ++count;
+
+            uint32 price = uint32(floor(pProto->BuyPrice * discountMod));
+
+            data << uint32(count);
+            data << uint32(crItem->item);
+            data << uint32(pProto->DisplayInfoID);
+            data << uint32(crItem->maxcount <= 0 ? 0xFFFFFFFF : creature->GetVendorItemCurrentCount(crItem));
+            data << uint32(price);
+            data << uint32(pProto->MaxDurability);
+            data << uint32(pProto->BuyCount);
+
+            if (count >= MAX_VENDOR_ITEMS)
+                break;
+        }
+
+        if (count == 0)
+        {
+            WorldPacket emptyData(SMSG_LIST_INVENTORY, 8 + 1 + 1);
+            emptyData << creature->GetObjectGuid();
+            emptyData << uint8(0);
+            emptyData << uint8(0);
+            player->GetSession()->SendPacket(emptyData);
+            return;
+        }
+
+        data.put<uint8>(count_pos, count);
+        player->GetSession()->SendPacket(data);
     }
 
     void TwinkmasterModule::OnLoadFromDB(Player* player)
@@ -192,7 +305,9 @@ namespace cmangos_module
         else
             playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_1, "Lock my XP gain", GOSSIP_SENDER_MAIN, ACTION_LOCK_XP, "", false);
 
-        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR, "Browse your wares", GOSSIP_SENDER_MAIN, ACTION_BROWSE_WARES, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR, "Browse Best-in-Slot gear", GOSSIP_SENDER_MAIN, ACTION_BROWSE_WARES, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR, "Browse Honor rewards", GOSSIP_SENDER_MAIN, ACTION_BROWSE_HONOR, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR, "Browse Rare acquisitions", GOSSIP_SENDER_MAIN, ACTION_BROWSE_RARE, "", false);
 
         playerMenu->SendGossipMenu(NPC_TEXT_GREETING, creature->GetObjectGuid());
         return true;
@@ -243,7 +358,20 @@ namespace cmangos_module
             }
             case ACTION_BROWSE_WARES:
             {
-                player->GetSession()->SendListInventory(creature->GetObjectGuid());
+                if (m_vendorCategories.empty())
+                    player->GetSession()->SendListInventory(creature->GetObjectGuid());
+                else
+                    SendFilteredVendorList(player, creature, VENDOR_CAT_BIS);
+                break;
+            }
+            case ACTION_BROWSE_HONOR:
+            {
+                SendFilteredVendorList(player, creature, VENDOR_CAT_HONOR);
+                break;
+            }
+            case ACTION_BROWSE_RARE:
+            {
+                SendFilteredVendorList(player, creature, VENDOR_CAT_RARE);
                 break;
             }
             case ACTION_MAIN_MENU:

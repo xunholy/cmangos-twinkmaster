@@ -4,10 +4,18 @@
 #include "Module.h"
 #include "TwinkmasterModuleConfig.h"
 
+#include <unordered_map>
 #include <unordered_set>
 
 namespace cmangos_module
 {
+    enum VendorCategory : uint8
+    {
+        VENDOR_CAT_BIS   = 1,
+        VENDOR_CAT_HONOR = 2,
+        VENDOR_CAT_RARE  = 4,
+    };
+
     class TwinkmasterModule : public Module
     {
     public:
@@ -34,7 +42,11 @@ namespace cmangos_module
         void UnlockXP(Player* player);
 
     private:
+        void LoadVendorCategories();
+        void SendFilteredVendorList(Player* player, Creature* creature, uint8 categoryMask);
+
         std::unordered_set<uint32> m_xpLockedPlayers;
+        std::unordered_map<uint32, uint8> m_vendorCategories;
     };
 }
 
