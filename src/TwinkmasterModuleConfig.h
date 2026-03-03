@@ -1,12 +1,15 @@
-#ifndef TWINKMASTER_MODULE_CONFIG_H
-#define TWINKMASTER_MODULE_CONFIG_H
+#pragma once
+#include "ModuleConfig.h"
 
-#include <cstdint>
-
-struct TwinkmasterConfig
+namespace cmangos_module
 {
-    bool enabled;
-    uint32_t targetLevel;
-};
+    class TwinkmasterModuleConfig : public ModuleConfig
+    {
+    public:
+        TwinkmasterModuleConfig();
+        bool OnLoad() override;
 
-#endif // TWINKMASTER_MODULE_CONFIG_H
+        bool enabled;
+        uint32 targetLevel;
+    };
+}

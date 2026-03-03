@@ -29,8 +29,7 @@ INSERT INTO `npc_text` (`ID`, `text0_0`) VALUES
 -- ============================================================
 
 -- Backup original prices for rollback
-DROP TABLE IF EXISTS `custom_twinkmaster_original_prices`;
-CREATE TABLE `custom_twinkmaster_original_prices` (
+CREATE TABLE IF NOT EXISTS `custom_twinkmaster_original_prices` (
   `entry` int(11) unsigned NOT NULL,
   `original_buy_price` int(11) unsigned NOT NULL DEFAULT 0,
   `original_sell_price` int(11) unsigned NOT NULL DEFAULT 0,

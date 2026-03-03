@@ -1,44 +1,41 @@
-#ifndef TWINKMASTER_MODULE_H
-#define TWINKMASTER_MODULE_H
+#ifndef CMANGOS_MODULE_TWINKMASTER_H
+#define CMANGOS_MODULE_TWINKMASTER_H
 
+#include "Module.h"
 #include "TwinkmasterModuleConfig.h"
+
 #include <unordered_set>
 
-class Player;
-
-class TwinkmasterModule
+namespace cmangos_module
 {
-public:
-    static TwinkmasterModule& Instance();
+    class TwinkmasterModule : public Module
+    {
+    public:
+        TwinkmasterModule();
+        const TwinkmasterModuleConfig* GetConfig() const override;
 
-    // Lifecycle
-    void LoadConfig();
-    const TwinkmasterConfig& GetConfig() const { return m_config; }
+        // Module hooks
+        void OnInitialize() override;
 
-    // Queries
-    bool IsEnabled() const { return m_config.enabled; }
-    uint32_t GetTargetLevel() const { return m_config.targetLevel; }
-    bool IsXpLocked(uint32_t guid) const;
+        // Player hooks
+        void OnLoadFromDB(Player* player) override;
+        void OnLogOut(Player* player) override;
+        bool OnPreGiveXP(Player* player, uint32& xp, Creature* victim) override;
+        bool OnPreGossipHello(Player* player, Creature* creature) override;
+        bool OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action, const std::string& code, uint32 gossipListId) override;
 
-    // Actions
-    void SetLevelAndLock(Player* player);
-    void LockXP(Player* player);
-    void UnlockXP(Player* player);
+        // Public helpers
+        bool IsEnabled() const;
+        uint32 GetTargetLevel() const;
+        bool IsXpLocked(uint32 guid) const;
 
-    // Hooks
-    void OnPlayerLogin(Player* player);
-    bool OnPreGiveXP(Player* player);
+        void SetLevelAndLock(Player* player);
+        void LockXP(Player* player);
+        void UnlockXP(Player* player);
 
-private:
-    TwinkmasterModule() = default;
-    TwinkmasterConfig m_config;
-    std::unordered_set<uint32_t> m_xpLockedPlayers; // in-memory cache
-};
+    private:
+        std::unordered_set<uint32> m_xpLockedPlayers;
+    };
+}
 
-#define sTwinkmasterModule TwinkmasterModule::Instance()
-
-// Script registration
-void AddSC_npc_twinkmaster();
-void InitTwinkmasterModule();
-
-#endif // TWINKMASTER_MODULE_H
+#endif
