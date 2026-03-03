@@ -2,7 +2,6 @@
 #include "Database/DatabaseEnv.h"
 #include "Entities/Player.h"
 #include "Entities/GossipDef.h"
-#include "Log.h"
 
 namespace cmangos_module
 {
@@ -16,9 +15,17 @@ namespace cmangos_module
         ACTION_MAIN_MENU          = 200,
     };
 
-    static const uint32 NPC_ENTRY           = 190012;
+    static const uint32 NPC_ENTRY_ALLIANCE   = 190012;
+    static const uint32 NPC_ENTRY_HORDE      = 190013;
     static const uint32 NPC_TEXT_GREETING    = 50920;
     static const uint32 NPC_TEXT_LEVEL       = 50921;
+
+    static bool IsTwinkmasterNPC(Creature* creature)
+    {
+        if (!creature) return false;
+        uint32 entry = creature->GetEntry();
+        return entry == NPC_ENTRY_ALLIANCE || entry == NPC_ENTRY_HORDE;
+    }
 
     TwinkmasterModule::TwinkmasterModule()
     : Module("Twinkmaster", new TwinkmasterModuleConfig())
@@ -47,10 +54,6 @@ namespace cmangos_module
 
     void TwinkmasterModule::OnInitialize()
     {
-        if (IsEnabled())
-            sLog.outString("[Twinkmaster] Module initialized. Target level: %u", GetTargetLevel());
-        else
-            sLog.outString("[Twinkmaster] Module disabled.");
     }
 
     void TwinkmasterModule::OnLoadFromDB(Player* player)
@@ -116,8 +119,6 @@ namespace cmangos_module
             guid);
 
         player->GetSession()->SendNotification("Your level has been set to %u and XP gain is now locked.", targetLevel);
-        sLog.outBasic("[Twinkmaster] Player %s (GUID: %u) set to level %u with XP locked.",
-                     player->GetName(), player->GetGUIDLow(), targetLevel);
     }
 
     void TwinkmasterModule::LockXP(Player* player)
@@ -166,7 +167,7 @@ namespace cmangos_module
 
     bool TwinkmasterModule::OnPreGossipHello(Player* player, Creature* creature)
     {
-        if (!IsEnabled() || !creature || creature->GetEntry() != NPC_ENTRY)
+        if (!IsEnabled() || !IsTwinkmasterNPC(creature))
             return false;
 
         player->PlayerTalkClass->ClearMenus();
@@ -194,7 +195,7 @@ namespace cmangos_module
 
     bool TwinkmasterModule::OnGossipSelect(Player* player, Creature* creature, uint32 sender, uint32 action, const std::string& code, uint32 gossipListId)
     {
-        if (!IsEnabled() || !creature || creature->GetEntry() != NPC_ENTRY)
+        if (!IsEnabled() || !IsTwinkmasterNPC(creature))
             return false;
 
         player->PlayerTalkClass->ClearMenus();
