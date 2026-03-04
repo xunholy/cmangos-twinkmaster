@@ -56,6 +56,7 @@ namespace cmangos_module
 
         std::unordered_set<uint32> m_xpLockedPlayers;
         std::unordered_map<uint8, std::vector<uint32>> m_categoryItems;
+        std::unordered_map<uint32, uint8> m_enchantSlotSelection;
     };
 }
 

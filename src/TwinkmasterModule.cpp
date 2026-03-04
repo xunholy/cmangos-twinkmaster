@@ -230,7 +230,11 @@ namespace cmangos_module
     void TwinkmasterModule::OnLogOut(Player* player)
     {
         if (player)
-            m_xpLockedPlayers.erase(player->GetGUIDLow());
+        {
+            uint32 guid = player->GetGUIDLow();
+            m_xpLockedPlayers.erase(guid);
+            m_enchantSlotSelection.erase(guid);
+        }
     }
 
     bool TwinkmasterModule::OnPreGiveXP(Player* player, uint32& xp, Creature* victim)
@@ -376,13 +380,10 @@ namespace cmangos_module
         if (!player)
             return;
 
-        // Clear all auras (debuffs + old buffs — we reapply fresh)
-        player->RemoveAllAuras();
-
         // Free full gear repair
         player->DurabilityRepairAll(false, 0.0f);
 
-        // Apply world buffs and class buffs
+        // Apply world buffs and class buffs (stacks on top of existing auras)
         static const uint32 BUFF_SPELLS[] =
         {
             // World buffs
@@ -397,13 +398,18 @@ namespace cmangos_module
             9887,   // Mark of the Wild Rank 7
             10940,  // Power Word: Fortitude Rank 6
             10158,  // Arcane Intellect Rank 5
+            10958,  // Shadow Protection Rank 3
+            9910,   // Thorns Rank 6
+            20217,  // Blessing of Kings
+            25291,  // Blessing of Might Rank 7
+            25290,  // Blessing of Wisdom Rank 6
             0       // sentinel
         };
 
         for (const uint32* spell = BUFF_SPELLS; *spell; ++spell)
             player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
 
-        player->GetSession()->SendNotification("Gear repaired, debuffs removed, all buffs applied!");
+        player->GetSession()->SendNotification("Gear repaired, all buffs applied!");
     }
 
     void TwinkmasterModule::SendFilteredVendorInventory(Player* player, Creature* creature, uint8 category)
@@ -471,9 +477,9 @@ namespace cmangos_module
         playerMenu->ClearMenus();
 
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE,    "BiS Gear",     GOSSIP_SENDER_MAIN, ACTION_BROWSE_BIS, "", false);
-        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR,    "Consumables",  GOSSIP_SENDER_MAIN, ACTION_BROWSE_CONSUMABLES, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_BATTLE,    "Honor Gear",   GOSSIP_SENDER_MAIN, ACTION_BROWSE_HONOR, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_DOT,       "Insane",       GOSSIP_SENDER_MAIN, ACTION_BROWSE_INSANE, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_VENDOR,    "Consumables",  GOSSIP_SENDER_MAIN, ACTION_BROWSE_CONSUMABLES, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT,      "Back",         GOSSIP_SENDER_MAIN, ACTION_MAIN_MENU, "", false);
 
         playerMenu->SendGossipMenu(NPC_TEXT_VENDOR, creature->GetObjectGuid());
@@ -506,8 +512,8 @@ namespace cmangos_module
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Bracers",         GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_WRISTS, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Gloves",          GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_HANDS, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Boots",           GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_FEET, "", false);
-        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Weapon",          GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_MAINHAND, "", false);
-        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Shield/Offhand",  GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_OFFHAND, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Main Hand",        GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_MAINHAND, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Off Hand",         GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_OFFHAND, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT,       "Back",            GOSSIP_SENDER_MAIN, ACTION_MAIN_MENU, "", false);
 
         playerMenu->SendGossipMenu(NPC_TEXT_GREETING, creature->GetObjectGuid());
@@ -519,13 +525,24 @@ namespace cmangos_module
         if (!playerMenu)
             return;
 
+        // Store the target slot so we apply enchant to the correct equipment slot
+        m_enchantSlotSelection[player->GetGUIDLow()] = equipSlot;
+
         playerMenu->ClearMenus();
 
         for (uint32 i = 0; i < ENCHANT_OPTIONS_COUNT; ++i)
         {
-            if (ENCHANT_OPTIONS[i].equipSlot == equipSlot)
+            const EnchantOption& opt = ENCHANT_OPTIONS[i];
+            bool match = (opt.equipSlot == equipSlot);
+
+            // For off-hand, also show 1H weapon enchants (not 2H-only)
+            if (equipSlot == EQUIPMENT_SLOT_OFFHAND &&
+                opt.equipSlot == EQUIPMENT_SLOT_MAINHAND && !opt.requires2H)
+                match = true;
+
+            if (match)
             {
-                playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, ENCHANT_OPTIONS[i].name,
+                playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, opt.name,
                     GOSSIP_SENDER_MAIN, ACTION_ENCHANT_BASE + i, "", false);
             }
         }
@@ -669,7 +686,11 @@ namespace cmangos_module
                     if (idx < ENCHANT_OPTIONS_COUNT)
                     {
                         const EnchantOption& opt = ENCHANT_OPTIONS[idx];
-                        Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, opt.equipSlot);
+
+                        // Use stored target slot (handles offhand weapon enchants)
+                        auto slotIt = m_enchantSlotSelection.find(player->GetGUIDLow());
+                        uint8 targetSlot = (slotIt != m_enchantSlotSelection.end()) ? slotIt->second : opt.equipSlot;
+                        Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, targetSlot);
 
                         if (opt.requires2H)
                         {
