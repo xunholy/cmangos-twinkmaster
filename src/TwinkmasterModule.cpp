@@ -346,9 +346,14 @@ namespace cmangos_module
             player->GetReputationMgr().SetReputation(factionEntry, 21000); // Revered
 
         // Set highest PvP rank (rank 14) so all honor gear is equippable
-        player->SetByteValue(PLAYER_FIELD_BYTES, 3, 14);
+        // PLAYER_BYTES_3 byte 3 = PvP rank display; DB column for equip checks
+        player->SetByteValue(PLAYER_BYTES_3, 3, 14);
 
         uint32 guid = player->GetGUIDLow();
+
+        CharacterDatabase.PExecute(
+            "UPDATE `characters` SET `honor_highest_rank` = 14 WHERE `guid` = %u", guid);
+
         m_xpLockedPlayers.insert(guid);
 
         CharacterDatabase.PExecute(
@@ -376,7 +381,8 @@ namespace cmangos_module
         m_xpLockedPlayers.insert(guid);
 
         CharacterDatabase.PExecute(
-            "REPLACE INTO `custom_twinkmaster_player_config` (`guid`, `xp_locked`, `level_set`) VALUES (%u, 1, 0)",
+            "INSERT INTO `custom_twinkmaster_player_config` (`guid`, `xp_locked`) VALUES (%u, 1) "
+            "ON DUPLICATE KEY UPDATE `xp_locked` = 1",
             guid);
 
         player->GetSession()->SendNotification("XP gain is now locked.");
@@ -412,18 +418,21 @@ namespace cmangos_module
         // Free full gear repair
         player->DurabilityRepairAll(false, 0.0f);
 
-        // World buffs + class buffs (stacks on top of existing auras)
-        static const uint32 BUFF_SPELLS[] =
+        // World buffs (faction-neutral)
+        static const uint32 WORLD_BUFFS[] =
         {
-            // World buffs
             22888,  // Rallying Cry of the Dragonslayer
             24425,  // Spirit of Zandalar
-            16609,  // Warchief's Blessing
             15366,  // Songflower Serenade
             22817,  // Fengus' Ferocity (DM Tribute)
             22818,  // Mol'dar's Moxie (DM Tribute)
             22819,  // Slip'kik's Savvy (DM Tribute)
-            // Class buffs (all classes)
+            0       // sentinel
+        };
+
+        // Class buffs (all classes)
+        static const uint32 CLASS_BUFFS[] =
+        {
             9887,   // Mark of the Wild Rank 7
             10940,  // Power Word: Fortitude Rank 6
             10958,  // Shadow Protection Rank 3
@@ -441,7 +450,14 @@ namespace cmangos_module
             0       // sentinel
         };
 
-        for (const uint32* spell = BUFF_SPELLS; *spell; ++spell)
+        for (const uint32* spell = WORLD_BUFFS; *spell; ++spell)
+            player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
+
+        // Warchief's Blessing is Horde-only
+        if (player->GetTeam() == HORDE)
+            player->CastSpell(player, 16609, TRIGGERED_OLD_TRIGGERED);
+
+        for (const uint32* spell = CLASS_BUFFS; *spell; ++spell)
             player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
 
         uint8 cls = player->getClass();
@@ -483,8 +499,9 @@ namespace cmangos_module
             if (pProto->Bonding == 1 && !(pProto->AllowableClass & classMask))
                 continue;
 
-            // Skip items not usable by this race
-            if (!(pProto->AllowableRace & raceMask))
+            // Skip items not usable by this race (AllowableRace -1 = all races)
+            if (pProto->AllowableRace != 0 && pProto->AllowableRace != -1 &&
+                !(pProto->AllowableRace & raceMask))
                 continue;
 
             if (count >= 255)

@@ -5,11 +5,14 @@ A CMaNGOS module that adds a **Twink Master** NPC for level 19 WSG twink charact
 ## Features
 
 ### NPC Gossip Menu
-- **Set level and lock XP** — sets player to target level (default 19), locks XP, and auto-learns:
+- **Set level and lock XP** — sets player to target level (default 19), locks XP, and grants:
   - Professions (First Aid, Fishing, Cooking, Engineering) at Journeyman
   - All class weapon skills maxed for level
-  - All class spells available at target level
+  - All class spells available at target level (validated by SpellFamilyName)
   - Riding Turtle mount (no level requirement)
+  - PvP rank 14 (Grand Marshal / High Warlord) for honor gear eligibility
+  - Timbermaw Hold Friendly reputation (Furbolg Medicine Pouch)
+  - WSG faction Revered reputation (Silverwing Sentinels / Warsong Outriders)
 - **Lock / Unlock XP** — toggle XP gain independently
 - **Browse your wares** — category vendor with class/race filtering:
   - BiS Gear (weapons, armor, rings, trinkets, shields, off-hands)
@@ -18,9 +21,10 @@ A CMaNGOS module that adds a **Twink Master** NPC for level 19 WSG twink charact
   - Consumables (potions, elixirs, arcanums, engineering gadgets, food, ammo)
 - **Reset my talents** — free talent reset
 - **Buff me up!** — applies world buffs + class buffs and repairs gear:
-  - Rallying Cry, Spirit of Zandalar, Warchief's Blessing, Songflower, DM Tribute
-  - Mark of the Wild, Fortitude, Arcane Intellect, Shadow Protection, Thorns
-  - Blessing of Kings, Blessing of Might, Blessing of Wisdom
+  - Rallying Cry, Spirit of Zandalar, Songflower, DM Tribute (all players)
+  - Warchief's Blessing (Horde only)
+  - Mark of the Wild, Fortitude, Shadow Protection, Thorns, BoK, BoM (all classes)
+  - Arcane Intellect, Blessing of Wisdom (mana classes only — skipped for Warriors/Rogues)
 - **Enchant my gear** — per-slot enchant menu:
   - Chest, Cloak, Bracers, Gloves, Boots, Main Hand, Off Hand
   - Off Hand supports both weapon enchants (for dual wielders) and shield enchants
@@ -91,7 +95,7 @@ Maps items to vendor categories, read by the C++ module at startup.
 
 ## Vendor System
 
-The module uses custom `SMSG_LIST_INVENTORY` packets to display filtered vendor lists per category. Items are filtered by the player's class and race at runtime. All vendor items are set to zero cost.
+The module uses custom `SMSG_LIST_INVENTORY` packets to display filtered vendor lists per category. Items are filtered by the player's class and race at runtime. Prices are set to zero in the custom packet — `item_template` prices are **not** modified, so items retain their normal price at other vendors on the server.
 
 ## License
 
