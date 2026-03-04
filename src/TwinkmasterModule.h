@@ -6,16 +6,10 @@
 
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace cmangos_module
 {
-    enum VendorCategory : uint8
-    {
-        VENDOR_CAT_BIS   = 1,
-        VENDOR_CAT_HONOR = 2,
-        VENDOR_CAT_RARE  = 4,
-    };
-
     class TwinkmasterModule : public Module
     {
     public:
@@ -42,11 +36,26 @@ namespace cmangos_module
         void UnlockXP(Player* player);
 
     private:
+        // Auto-learn helpers
+        void LearnProfessions(Player* player);
+        void LearnWeaponSkills(Player* player);
+        void LearnClassSpells(Player* player);
+
+        // Buff helper
+        void ApplyBuffPackage(Player* player);
+
+        // Enchant helpers
+        void ApplyEnchant(Player* player, Item* item, uint32 enchantId);
+        void ShowEnchantSlotMenu(Player* player, Creature* creature);
+        void ShowEnchantOptions(Player* player, Creature* creature, uint8 equipSlot);
+
+        // Vendor category helpers
         void LoadVendorCategories();
-        void SendFilteredVendorList(Player* player, Creature* creature, uint8 categoryMask);
+        void SendFilteredVendorInventory(Player* player, Creature* creature, uint8 category);
+        void ShowBrowseMenu(Player* player, Creature* creature);
 
         std::unordered_set<uint32> m_xpLockedPlayers;
-        std::unordered_map<uint32, uint8> m_vendorCategories;
+        std::unordered_map<uint8, std::vector<uint32>> m_categoryItems;
     };
 }
 
