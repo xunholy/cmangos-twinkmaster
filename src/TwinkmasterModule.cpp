@@ -6,6 +6,7 @@
 #include "Server/WorldPacket.h"
 #include "Server/Opcodes.h"
 #include "Globals/ObjectMgr.h"
+#include "DBCStores.h"
 
 namespace cmangos_module
 {
@@ -289,10 +290,26 @@ namespace cmangos_module
         if (!result)
             return;
 
+        // SpellFamilyName per class: 0=unused, 1=War(4), 2=Pal(10), 3=Hun(9),
+        // 4=Rog(8), 5=Pri(6), 7=Sha(11), 8=Mag(3), 9=Wlk(5), 11=Dru(7)
+        static const uint32 CLASS_SPELL_FAMILY[] = {
+            0, 4, 10, 9, 8, 6, 0, 11, 3, 5, 0, 7
+        };
+        uint32 expectedFamily = (classId < 12) ? CLASS_SPELL_FAMILY[classId] : 0;
+
         do
         {
             Field* fields = result->Fetch();
             uint32 spellId = fields[0].GetUInt32();
+
+            // Validate spell belongs to this class (skip cross-class spells)
+            SpellEntry const* spellInfo = sSpellTemplate.LookupEntry<SpellEntry>(spellId);
+            if (!spellInfo)
+                continue;
+
+            if (spellInfo->SpellFamilyName != 0 && spellInfo->SpellFamilyName != expectedFamily)
+                continue;
+
             if (!player->HasSpell(spellId))
                 player->learnSpell(spellId, false);
         } while (result->NextRow());
@@ -319,6 +336,18 @@ namespace cmangos_module
         // Riding Turtle mount (no level requirement)
         player->learnSpell(30174, false);
 
+        // Timbermaw Hold (faction 576) - Friendly for Furbolg Medicine Pouch
+        if (FactionEntry const* factionEntry = sFactionStore.LookupEntry(576))
+            player->GetReputationMgr().SetReputation(factionEntry, 3000);
+
+        // Silverwing Sentinels / Warsong Outriders (WSG factions)
+        uint32 wsgFaction = (player->GetTeam() == ALLIANCE) ? 890 : 889;
+        if (FactionEntry const* factionEntry = sFactionStore.LookupEntry(wsgFaction))
+            player->GetReputationMgr().SetReputation(factionEntry, 21000); // Revered
+
+        // Set highest PvP rank (rank 14) so all honor gear is equippable
+        player->SetByteValue(PLAYER_FIELD_BYTES, 3, 14);
+
         uint32 guid = player->GetGUIDLow();
         m_xpLockedPlayers.insert(guid);
 
@@ -327,7 +356,7 @@ namespace cmangos_module
             guid);
 
         player->GetSession()->SendNotification(
-            "Level set to %u, XP locked. Mount, professions, weapon skills, and class spells learned!",
+            "Level set to %u, XP locked. Rank 14, reputations, mount, professions, and spells granted!",
             targetLevel);
     }
 
