@@ -383,7 +383,7 @@ namespace cmangos_module
         // Free full gear repair
         player->DurabilityRepairAll(false, 0.0f);
 
-        // Apply world buffs and class buffs (stacks on top of existing auras)
+        // World buffs + class buffs (stacks on top of existing auras)
         static const uint32 BUFF_SPELLS[] =
         {
             // World buffs
@@ -394,20 +394,33 @@ namespace cmangos_module
             22817,  // Fengus' Ferocity (DM Tribute)
             22818,  // Mol'dar's Moxie (DM Tribute)
             22819,  // Slip'kik's Savvy (DM Tribute)
-            // Class buffs (max vanilla rank)
+            // Class buffs (all classes)
             9887,   // Mark of the Wild Rank 7
             10940,  // Power Word: Fortitude Rank 6
-            10158,  // Arcane Intellect Rank 5
             10958,  // Shadow Protection Rank 3
             9910,   // Thorns Rank 6
             20217,  // Blessing of Kings
             25291,  // Blessing of Might Rank 7
+            0       // sentinel
+        };
+
+        // Mana-class only buffs (skip for Warriors and Rogues)
+        static const uint32 MANA_BUFFS[] =
+        {
+            10158,  // Arcane Intellect Rank 5
             25290,  // Blessing of Wisdom Rank 6
             0       // sentinel
         };
 
         for (const uint32* spell = BUFF_SPELLS; *spell; ++spell)
             player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
+
+        uint8 cls = player->getClass();
+        if (cls != 1 && cls != 4)  // not Warrior, not Rogue
+        {
+            for (const uint32* spell = MANA_BUFFS; *spell; ++spell)
+                player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
+        }
 
         player->GetSession()->SendNotification("Gear repaired, all buffs applied!");
     }
