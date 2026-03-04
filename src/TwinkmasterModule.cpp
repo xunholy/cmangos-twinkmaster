@@ -401,7 +401,7 @@ namespace cmangos_module
         };
 
         for (const uint32* spell = BUFF_SPELLS; *spell; ++spell)
-            player->CastSpell(player, *spell, true);
+            player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
 
         player->GetSession()->SendNotification("Gear repaired, debuffs removed, all buffs applied!");
     }
@@ -459,7 +459,7 @@ namespace cmangos_module
         }
 
         data.put<uint8>(countPos, count);
-        player->GetSession()->SendPacket(&data);
+        player->GetSession()->SendPacket(data);
     }
 
     void TwinkmasterModule::ShowBrowseMenu(Player* player, Creature* creature)
@@ -640,7 +640,7 @@ namespace cmangos_module
             }
             case ACTION_RESPEC:
             {
-                player->ResetTalents(true);
+                player->resetTalents(true);
                 player->GetSession()->SendNotification("Talents have been reset.");
                 playerMenu->CloseGossip();
                 break;
