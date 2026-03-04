@@ -6,7 +6,7 @@
 #include "Server/WorldPacket.h"
 #include "Server/Opcodes.h"
 #include "Globals/ObjectMgr.h"
-#include "DBCStores.h"
+#include "Server/DBCStores.h"
 
 namespace cmangos_module
 {
