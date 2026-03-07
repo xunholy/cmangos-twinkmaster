@@ -90,9 +90,33 @@ namespace cmangos_module
 
     static const EnchantOption ENCHANT_OPTIONS[] =
     {
+        // Head (also used for Legs — arcanums work on both)
+        { "Rapidity (+1% Haste)",           2543, EQUIPMENT_SLOT_HEAD,      false },
+        { "Focus (+8 SP)",                  2544, EQUIPMENT_SLOT_HEAD,      false },
+        { "Protection (+1% Dodge)",         2545, EQUIPMENT_SLOT_HEAD,      false },
+        { "Constitution (+100 HP)",         1503, EQUIPMENT_SLOT_HEAD,      false },
+        { "Rumination (+150 Mana)",         1483, EQUIPMENT_SLOT_HEAD,      false },
+        { "Tenacity (+125 Armor)",          1504, EQUIPMENT_SLOT_HEAD,      false },
+        { "Resilience (+20 FR)",            1505, EQUIPMENT_SLOT_HEAD,      false },
+        { "Voracity (+8 Str)",              1506, EQUIPMENT_SLOT_HEAD,      false },
+        { "Voracity (+8 Agi)",              1507, EQUIPMENT_SLOT_HEAD,      false },
+        { "Voracity (+8 Stam)",             1508, EQUIPMENT_SLOT_HEAD,      false },
+        { "Voracity (+8 Int)",              1509, EQUIPMENT_SLOT_HEAD,      false },
+        { "Voracity (+8 Spi)",              1510, EQUIPMENT_SLOT_HEAD,      false },
+
+        // Shoulders
+        { "Might (+30 AP)",                          2606, EQUIPMENT_SLOT_SHOULDERS, false },
+        { "Mojo (+18 SP)",                           2605, EQUIPMENT_SLOT_SHOULDERS, false },
+        { "Serenity (+33 Healing)",                  2604, EQUIPMENT_SLOT_SHOULDERS, false },
+        { "Power of the Scourge (+15 SP, +1% Crit)", 2721, EQUIPMENT_SLOT_SHOULDERS, false },
+        { "Might of the Scourge (+26 AP, +1% Crit)", 2717, EQUIPMENT_SLOT_SHOULDERS, false },
+        { "Resilience (+31 Heal, +5 MP5)",           2715, EQUIPMENT_SLOT_SHOULDERS, false },
+        { "Fortitude (+16 Stam, +100 Armor)",        2716, EQUIPMENT_SLOT_SHOULDERS, false },
+
         // Chest
         { "Greater Stats (+4 all)",    1891, EQUIPMENT_SLOT_CHEST,    false },
         { "Greater Health (+100 HP)",  1892, EQUIPMENT_SLOT_CHEST,    false },
+        { "Greater Mana (+100 Mana)",  1893, EQUIPMENT_SLOT_CHEST,    false },
 
         // Cloak
         { "Dodge (+1%)",               2622, EQUIPMENT_SLOT_BACK,     false },
@@ -110,6 +134,7 @@ namespace cmangos_module
 
         // Gloves
         { "Agility (+7)",              2564, EQUIPMENT_SLOT_HANDS,    false },
+        { "Strength (+7)",             2563, EQUIPMENT_SLOT_HANDS,    false },
         { "Fire Power (+20)",          2616, EQUIPMENT_SLOT_HANDS,    false },
         { "Frost Power (+20)",         2615, EQUIPMENT_SLOT_HANDS,    false },
         { "Shadow Power (+20)",        2614, EQUIPMENT_SLOT_HANDS,    false },
@@ -192,6 +217,7 @@ namespace cmangos_module
     void TwinkmasterModule::LoadVendorCategories()
     {
         m_categoryItems.clear();
+        m_allVendorItemIds.clear();
 
         auto result = WorldDatabase.PQuery("SELECT item, categories FROM custom_twinkmaster_vendor_categories");
         if (!result)
@@ -204,6 +230,7 @@ namespace cmangos_module
             uint32 itemId = fields[0].GetUInt32();
             uint8 category = fields[1].GetUInt8();
             m_categoryItems[category].push_back(itemId);
+            m_allVendorItemIds.insert(itemId);
             ++count;
         } while (result->NextRow());
     }
@@ -235,6 +262,7 @@ namespace cmangos_module
             uint32 guid = player->GetGUIDLow();
             m_xpLockedPlayers.erase(guid);
             m_enchantSlotSelection.erase(guid);
+            m_activeVendorPlayers.erase(guid);
         }
     }
 
@@ -336,23 +364,23 @@ namespace cmangos_module
         // Riding Turtle mount (no level requirement)
         player->learnSpell(30174, false);
 
-        // Timbermaw Hold (faction 576) - Friendly for Furbolg Medicine Pouch
+        // Timbermaw Hold (faction 576) - Exalted for Defender of the Timbermaw
         if (FactionEntry const* factionEntry = sFactionStore.LookupEntry(576))
-            player->GetReputationMgr().SetReputation(factionEntry, 3000);
+            player->GetReputationMgr().SetReputation(factionEntry, 42000);
 
         // Silverwing Sentinels / Warsong Outriders (WSG factions)
         uint32 wsgFaction = (player->GetTeam() == ALLIANCE) ? 890 : 889;
         if (FactionEntry const* factionEntry = sFactionStore.LookupEntry(wsgFaction))
             player->GetReputationMgr().SetReputation(factionEntry, 21000); // Revered
 
-        // Set highest PvP rank (rank 14) so all honor gear is equippable
+        // Set PvP rank 9 (Knight-Captain / Centurion) for honor gear
         // PLAYER_BYTES_3 byte 3 = PvP rank display; DB column for equip checks
-        player->SetByteValue(PLAYER_BYTES_3, 3, 14);
+        player->SetByteValue(PLAYER_BYTES_3, 3, 9);
 
         uint32 guid = player->GetGUIDLow();
 
         CharacterDatabase.PExecute(
-            "UPDATE `characters` SET `honor_highest_rank` = 14 WHERE `guid` = %u", guid);
+            "UPDATE `characters` SET `honor_highest_rank` = 9 WHERE `guid` = %u", guid);
 
         m_xpLockedPlayers.insert(guid);
 
@@ -361,7 +389,7 @@ namespace cmangos_module
             guid);
 
         player->GetSession()->SendNotification(
-            "Level set to %u, XP locked. Rank 14, reputations, mount, professions, and spells granted!",
+            "Level set to %u, XP locked. Rank 9, reputations, mount, professions, and spells granted!",
             targetLevel);
     }
 
@@ -410,9 +438,9 @@ namespace cmangos_module
         player->GetSession()->SendNotification("XP gain is now unlocked.");
     }
 
-    void TwinkmasterModule::ApplyBuffPackage(Player* player)
+    void TwinkmasterModule::ApplyBuffPackage(Player* player, Creature* creature)
     {
-        if (!player)
+        if (!player || !creature)
             return;
 
         // Free full gear repair
@@ -430,7 +458,7 @@ namespace cmangos_module
             0       // sentinel
         };
 
-        // Class buffs (all classes)
+        // Class buffs (all classes) — cast by NPC to avoid teaching spells
         static const uint32 CLASS_BUFFS[] =
         {
             9887,   // Mark of the Wild Rank 7
@@ -451,20 +479,20 @@ namespace cmangos_module
         };
 
         for (const uint32* spell = WORLD_BUFFS; *spell; ++spell)
-            player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
+            creature->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
 
         // Warchief's Blessing is Horde-only
         if (player->GetTeam() == HORDE)
-            player->CastSpell(player, 16609, TRIGGERED_OLD_TRIGGERED);
+            creature->CastSpell(player, 16609, TRIGGERED_OLD_TRIGGERED);
 
         for (const uint32* spell = CLASS_BUFFS; *spell; ++spell)
-            player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
+            creature->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
 
         uint8 cls = player->getClass();
         if (cls != 1 && cls != 4)  // not Warrior, not Rogue
         {
             for (const uint32* spell = MANA_BUFFS; *spell; ++spell)
-                player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
+                creature->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
         }
 
         player->GetSession()->SendNotification("Gear repaired, all buffs applied!");
@@ -525,6 +553,7 @@ namespace cmangos_module
 
         data.put<uint8>(countPos, count);
         player->GetSession()->SendPacket(data);
+        m_activeVendorPlayers.insert(player->GetGUIDLow());
     }
 
     void TwinkmasterModule::ShowBrowseMenu(Player* player, Creature* creature)
@@ -566,13 +595,16 @@ namespace cmangos_module
 
         playerMenu->ClearMenus();
 
-        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Chest",          GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_CHEST, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Head",             GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_HEAD, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Shoulders",       GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_SHOULDERS, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Chest",           GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_CHEST, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Cloak",           GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_BACK, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Bracers",         GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_WRISTS, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Gloves",          GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_HANDS, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Legs",            GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_LEGS, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Boots",           GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_FEET, "", false);
-        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Main Hand",        GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_MAINHAND, "", false);
-        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Off Hand",         GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_OFFHAND, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Main Hand",       GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_MAINHAND, "", false);
+        playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_INTERACT_2, "Off Hand",        GOSSIP_SENDER_MAIN, ACTION_ENCHANT_SLOT_BASE + EQUIPMENT_SLOT_OFFHAND, "", false);
         playerMenu->GetGossipMenu().AddMenuItem(GOSSIP_ICON_CHAT,       "Back",            GOSSIP_SENDER_MAIN, ACTION_MAIN_MENU, "", false);
 
         playerMenu->SendGossipMenu(NPC_TEXT_GREETING, creature->GetObjectGuid());
@@ -594,6 +626,10 @@ namespace cmangos_module
             const EnchantOption& opt = ENCHANT_OPTIONS[i];
             bool match = (opt.equipSlot == equipSlot);
 
+            // For legs, also show head slot enchants (arcanums work on both)
+            if (equipSlot == EQUIPMENT_SLOT_LEGS && opt.equipSlot == EQUIPMENT_SLOT_HEAD)
+                match = true;
+
             // For off-hand, also show 1H weapon enchants (not 2H-only)
             if (equipSlot == EQUIPMENT_SLOT_OFFHAND &&
                 opt.equipSlot == EQUIPMENT_SLOT_MAINHAND && !opt.requires2H)
@@ -613,6 +649,9 @@ namespace cmangos_module
 
     bool TwinkmasterModule::OnPreGossipHello(Player* player, Creature* creature)
     {
+        if (player)
+            m_activeVendorPlayers.erase(player->GetGUIDLow());
+
         if (!IsEnabled() || !IsTwinkmasterNPC(creature))
             return false;
 
@@ -723,7 +762,7 @@ namespace cmangos_module
             }
             case ACTION_BUFF:
             {
-                ApplyBuffPackage(player);
+                ApplyBuffPackage(player, creature);
                 playerMenu->CloseGossip();
                 break;
             }
@@ -790,5 +829,70 @@ namespace cmangos_module
         }
 
         return true;
+    }
+
+    bool TwinkmasterModule::OnUseItem(Player* player, Item* item)
+    {
+        if (!IsEnabled() || !player || !item)
+            return false;
+
+        // Enchant patch items that bypass level requirements
+        // Maps item ID → { enchant ID, target equipment slot }
+        struct PatchMapping { uint32 itemId; uint32 enchantId; uint8 slot; };
+        static const PatchMapping PATCH_ITEMS[] =
+        {
+            // Naxx shoulder enchants
+            { 23545, 2721, EQUIPMENT_SLOT_SHOULDERS }, // Power of the Scourge
+            { 23547, 2715, EQUIPMENT_SLOT_SHOULDERS }, // Resilience of the Scourge
+            { 23548, 2717, EQUIPMENT_SLOT_SHOULDERS }, // Might of the Scourge
+            { 23549, 2716, EQUIPMENT_SLOT_SHOULDERS }, // Fortitude of the Scourge
+            // BRD arcanums (default to head; use NPC menu for legs)
+            { 11642, 1503, EQUIPMENT_SLOT_HEAD },      // Lesser Arcanum of Constitution
+            { 11622, 1483, EQUIPMENT_SLOT_HEAD },      // Lesser Arcanum of Rumination
+        };
+
+        uint32 itemId = item->GetEntry();
+        for (const auto& patch : PATCH_ITEMS)
+        {
+            if (itemId != patch.itemId)
+                continue;
+
+            Item* target = player->GetItemByPos(INVENTORY_SLOT_BAG_0, patch.slot);
+            if (!target)
+            {
+                player->GetSession()->SendNotification("No item equipped in that slot.");
+                return true;
+            }
+
+            ApplyEnchant(player, target, patch.enchantId);
+            player->DestroyItemCount(itemId, 1, true);
+            return true;
+        }
+
+        return false;
+    }
+
+    void TwinkmasterModule::OnStoreItem(Player* player, Item* item)
+    {
+        if (!IsEnabled() || !player || !item)
+            return;
+
+        uint32 guid = player->GetGUIDLow();
+        if (m_activeVendorPlayers.count(guid) == 0)
+            return;
+
+        uint32 itemId = item->GetEntry();
+        if (m_allVendorItemIds.count(itemId) == 0)
+            return;
+
+        const ItemPrototype* pProto = item->GetProto();
+        if (!pProto || pProto->BuyPrice == 0)
+            return;
+
+        uint32 refund = pProto->BuyPrice;
+        if (pProto->BuyCount > 1)
+            refund = (refund * item->GetCount()) / pProto->BuyCount;
+
+        player->ModifyMoney(refund);
     }
 }
