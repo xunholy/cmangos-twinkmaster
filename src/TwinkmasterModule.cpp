@@ -458,23 +458,22 @@ namespace cmangos_module
             0       // sentinel
         };
 
-        // Class buffs (all classes) — cast by NPC to avoid teaching spells
+        // Class buffs — level-appropriate ranks for level 19
         static const uint32 CLASS_BUFFS[] =
         {
-            9887,   // Mark of the Wild Rank 7
-            10940,  // Power Word: Fortitude Rank 6
-            10958,  // Shadow Protection Rank 3
-            9910,   // Thorns Rank 6
-            20217,  // Blessing of Kings
-            25291,  // Blessing of Might Rank 7
+            5232,   // Mark of the Wild Rank 2 (level 10)
+            1244,   // Power Word: Fortitude Rank 2 (level 12)
+            782,    // Thorns Rank 2 (level 14)
+            20217,  // Blessing of Kings (no rank, talent)
+            19834,  // Blessing of Might Rank 2 (level 12)
             0       // sentinel
         };
 
         // Mana-class only buffs (skip for Warriors and Rogues)
         static const uint32 MANA_BUFFS[] =
         {
-            10158,  // Arcane Intellect Rank 5
-            25290,  // Blessing of Wisdom Rank 6
+            1460,   // Arcane Intellect Rank 2 (level 14)
+            19742,  // Blessing of Wisdom Rank 1 (level 14)
             0       // sentinel
         };
 
