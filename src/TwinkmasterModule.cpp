@@ -486,13 +486,13 @@ namespace cmangos_module
             creature->CastSpell(player, 16609, TRIGGERED_OLD_TRIGGERED);
 
         for (const uint32* spell = CLASS_BUFFS; *spell; ++spell)
-            creature->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
+            player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
 
         uint8 cls = player->getClass();
         if (cls != 1 && cls != 4)  // not Warrior, not Rogue
         {
             for (const uint32* spell = MANA_BUFFS; *spell; ++spell)
-                creature->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
+                player->CastSpell(player, *spell, TRIGGERED_OLD_TRIGGERED);
         }
 
         player->GetSession()->SendNotification("Gear repaired, all buffs applied!");
