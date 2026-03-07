@@ -373,14 +373,14 @@ namespace cmangos_module
         if (FactionEntry const* factionEntry = sFactionStore.LookupEntry(wsgFaction))
             player->GetReputationMgr().SetReputation(factionEntry, 21000); // Revered
 
-        // Set PvP rank 9 (Knight-Captain / Centurion) for honor gear
+        // Set PvP rank 14 (Grand Marshal / High Warlord) for all honor gear
         // PLAYER_BYTES_3 byte 3 = PvP rank display; DB column for equip checks
-        player->SetByteValue(PLAYER_BYTES_3, 3, 9);
+        player->SetByteValue(PLAYER_BYTES_3, 3, 14);
 
         uint32 guid = player->GetGUIDLow();
 
         CharacterDatabase.PExecute(
-            "UPDATE `characters` SET `honor_highest_rank` = 9 WHERE `guid` = %u", guid);
+            "UPDATE `characters` SET `honor_highest_rank` = 14 WHERE `guid` = %u", guid);
 
         m_xpLockedPlayers.insert(guid);
 
@@ -389,7 +389,7 @@ namespace cmangos_module
             guid);
 
         player->GetSession()->SendNotification(
-            "Level set to %u, XP locked. Rank 9, reputations, mount, professions, and spells granted!",
+            "Level set to %u, XP locked. Rank 14, reputations, mount, professions, and spells granted!",
             targetLevel);
     }
 
