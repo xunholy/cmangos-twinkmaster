@@ -99,8 +99,8 @@ namespace cmangos_module
         { "Tenacity (+125 Armor)",          1504, EQUIPMENT_SLOT_HEAD,      false },
         { "Resilience (+20 FR)",            1505, EQUIPMENT_SLOT_HEAD,      false },
         { "Voracity (+8 Str)",              1506, EQUIPMENT_SLOT_HEAD,      false },
-        { "Voracity (+8 Agi)",              1507, EQUIPMENT_SLOT_HEAD,      false },
-        { "Voracity (+8 Stam)",             1508, EQUIPMENT_SLOT_HEAD,      false },
+        { "Voracity (+8 Agi)",              1508, EQUIPMENT_SLOT_HEAD,      false },
+        { "Voracity (+8 Stam)",             1507, EQUIPMENT_SLOT_HEAD,      false },
         { "Voracity (+8 Int)",              1509, EQUIPMENT_SLOT_HEAD,      false },
         { "Voracity (+8 Spi)",              1510, EQUIPMENT_SLOT_HEAD,      false },
 
@@ -133,15 +133,15 @@ namespace cmangos_module
         { "MP5 (+4)",                  2565, EQUIPMENT_SLOT_WRISTS,   false },
 
         // Gloves
-        { "Agility (+7)",              2564, EQUIPMENT_SLOT_HANDS,    false },
-        { "Strength (+7)",             2563, EQUIPMENT_SLOT_HANDS,    false },
+        { "Agility (+15)",             2564, EQUIPMENT_SLOT_HANDS,    false },
+        { "Strength (+15)",            2563, EQUIPMENT_SLOT_HANDS,    false },
         { "Fire Power (+20)",          2616, EQUIPMENT_SLOT_HANDS,    false },
         { "Frost Power (+20)",         2615, EQUIPMENT_SLOT_HANDS,    false },
         { "Shadow Power (+20)",        2614, EQUIPMENT_SLOT_HANDS,    false },
         { "Healing (+30)",             2617, EQUIPMENT_SLOT_HANDS,    false },
 
         // Boots
-        { "Agility (+7)",               904, EQUIPMENT_SLOT_FEET,     false },
+        { "Agility (+7)",              1887, EQUIPMENT_SLOT_FEET,     false },
         { "Minor Speed",                911, EQUIPMENT_SLOT_FEET,     false },
         { "Stamina (+7)",               929, EQUIPMENT_SLOT_FEET,     false },
 
@@ -155,14 +155,14 @@ namespace cmangos_module
         { "Icy Chill",                 1894, EQUIPMENT_SLOT_MAINHAND, false },
         { "Demonslaying",               912, EQUIPMENT_SLOT_MAINHAND, false },
         { "Agility (+25, 2H only)",    2646, EQUIPMENT_SLOT_MAINHAND, true  },
-        { "Intellect (+22, 2H only)",  2568, EQUIPMENT_SLOT_MAINHAND, true  },
-        { "Spirit (+20, 2H only)",     2567, EQUIPMENT_SLOT_MAINHAND, true  },
+        { "Intellect (+22)",           2568, EQUIPMENT_SLOT_MAINHAND, false },
+        { "Spirit (+20)",              2567, EQUIPMENT_SLOT_MAINHAND, false },
 
         // Shield/Offhand
-        { "Spirit (+7)",               1890, EQUIPMENT_SLOT_OFFHAND,  false },
+        { "Spirit (+9)",               1890, EQUIPMENT_SLOT_OFFHAND,  false },
         { "Stamina (+7)",               929, EQUIPMENT_SLOT_OFFHAND,  false },
         { "Frost Resistance (+8)",      926, EQUIPMENT_SLOT_OFFHAND,  false },
-        { "Shield Spike (26-38 dmg)",  1704, EQUIPMENT_SLOT_OFFHAND,  false },
+        { "Shield Spike (20-30 dmg)",  1704, EQUIPMENT_SLOT_OFFHAND,  false },
     };
 
     static const uint32 ENCHANT_OPTIONS_COUNT = sizeof(ENCHANT_OPTIONS) / sizeof(ENCHANT_OPTIONS[0]);
