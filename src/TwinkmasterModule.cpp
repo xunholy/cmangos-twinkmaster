@@ -217,7 +217,6 @@ namespace cmangos_module
     void TwinkmasterModule::LoadVendorCategories()
     {
         m_categoryItems.clear();
-        m_allVendorItemIds.clear();
 
         auto result = WorldDatabase.PQuery("SELECT item, categories FROM custom_twinkmaster_vendor_categories");
         if (!result)
@@ -230,7 +229,6 @@ namespace cmangos_module
             uint32 itemId = fields[0].GetUInt32();
             uint8 category = fields[1].GetUInt8();
             m_categoryItems[category].push_back(itemId);
-            m_allVendorItemIds.insert(itemId);
             ++count;
         } while (result->NextRow());
     }
@@ -262,7 +260,6 @@ namespace cmangos_module
             uint32 guid = player->GetGUIDLow();
             m_xpLockedPlayers.erase(guid);
             m_enchantSlotSelection.erase(guid);
-            m_activeVendorPlayers.erase(guid);
         }
     }
 
@@ -382,6 +379,9 @@ namespace cmangos_module
         CharacterDatabase.PExecute(
             "UPDATE `characters` SET `honor_highest_rank` = 14 WHERE `guid` = %u", guid);
 
+        // Give 250 gold for vendor purchases
+        player->ModifyMoney(2500000);
+
         m_xpLockedPlayers.insert(guid);
 
         CharacterDatabase.PExecute(
@@ -389,7 +389,7 @@ namespace cmangos_module
             guid);
 
         player->GetSession()->SendNotification(
-            "Level set to %u, XP locked. Rank 14, reputations, mount, professions, and spells granted!",
+            "Level set to %u, XP locked. 250g, rank 14, reputations, mount, professions, and spells granted!",
             targetLevel);
     }
 
@@ -553,7 +553,6 @@ namespace cmangos_module
 
         data.put<uint8>(countPos, count);
         player->GetSession()->SendPacket(data);
-        m_activeVendorPlayers.insert(player->GetGUIDLow());
     }
 
     void TwinkmasterModule::ShowBrowseMenu(Player* player, Creature* creature)
@@ -649,10 +648,7 @@ namespace cmangos_module
 
     bool TwinkmasterModule::OnPreGossipHello(Player* player, Creature* creature)
     {
-        if (player)
-            m_activeVendorPlayers.erase(player->GetGUIDLow());
-
-        if (!IsEnabled() || !IsTwinkmasterNPC(creature))
+        if (!IsEnabled() || !player || !IsTwinkmasterNPC(creature))
             return false;
 
         PlayerMenu* playerMenu = player->GetPlayerMenu();
@@ -870,29 +866,5 @@ namespace cmangos_module
         }
 
         return false;
-    }
-
-    void TwinkmasterModule::OnStoreItem(Player* player, Item* item)
-    {
-        if (!IsEnabled() || !player || !item)
-            return;
-
-        uint32 guid = player->GetGUIDLow();
-        if (m_activeVendorPlayers.count(guid) == 0)
-            return;
-
-        uint32 itemId = item->GetEntry();
-        if (m_allVendorItemIds.count(itemId) == 0)
-            return;
-
-        const ItemPrototype* pProto = item->GetProto();
-        if (!pProto || pProto->BuyPrice == 0)
-            return;
-
-        uint32 refund = pProto->BuyPrice;
-        if (pProto->BuyCount > 1)
-            refund = (refund * item->GetCount()) / pProto->BuyCount;
-
-        player->ModifyMoney(refund);
     }
 }
