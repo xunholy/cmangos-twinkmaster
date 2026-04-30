@@ -201,6 +201,7 @@ INSERT INTO `custom_twinkmaster_vendor_categories` (`item`, `categories`) VALUES
 (6890,  2),  -- Smoked Bear Meat
 -- Weapon buffs
 (4406,  2),  -- Standard Scope (+2 damage)
+(10548, 2),  -- Sniper Scope (+7 damage)
 (2871,  2),  -- Heavy Sharpening Stone (+4 weapon damage)
 (2863,  2),  -- Coarse Sharpening Stone (+3 weapon damage)
 (20744, 2),  -- Minor Wizard Oil (+8 Spell Damage)
@@ -325,10 +326,13 @@ WHERE `entry` IN (23545, 23547, 23548, 23549);
 -- ============================================================
 -- Restore original prices if previously zeroed, then drop backup
 -- ============================================================
-UPDATE `item_template` it
-JOIN `custom_twinkmaster_original_prices` op ON it.`entry` = op.`entry`
-SET it.`BuyPrice` = op.`original_buy_price`, it.`SellPrice` = op.`original_sell_price`
-WHERE it.`BuyPrice` = 0 AND op.`original_buy_price` > 0;
+SET @tbl_exists = (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'custom_twinkmaster_original_prices');
+SET @restore_sql = IF(@tbl_exists > 0,
+  'UPDATE `item_template` it JOIN `custom_twinkmaster_original_prices` op ON it.`entry` = op.`entry` SET it.`BuyPrice` = op.`original_buy_price`, it.`SellPrice` = op.`original_sell_price` WHERE it.`BuyPrice` = 0 AND op.`original_buy_price` > 0',
+  'SELECT 1');
+PREPARE stmt FROM @restore_sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 DROP TABLE IF EXISTS `custom_twinkmaster_original_prices`;
 
 -- ============================================================
